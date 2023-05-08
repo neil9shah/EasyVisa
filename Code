@@ -1,0 +1,951 @@
+# Libraries to help with reading and manipulating data
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Removes the limit for the number of displayed columns
+pd.set_option("display.max_columns", None)
+# Sets the limit for the number of displayed rows
+pd.set_option("display.max_rows", 100)
+
+
+# Libraries different ensemble classifiers
+from sklearn.ensemble import (
+    BaggingClassifier,
+    RandomForestClassifier,
+    AdaBoostClassifier,
+    GradientBoostingClassifier,
+    StackingClassifier,
+)
+
+from xgboost import XGBClassifier
+from sklearn.tree import DecisionTreeClassifier
+
+# Libraries to get different metric scores
+from sklearn import metrics
+from sklearn.metrics import (
+    confusion_matrix,
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+)
+
+# To tune different models
+from sklearn.model_selection import GridSearchCV
+#getting dataset from drive
+from google.colab import drive
+drive.mount('/content/drive')
+Mounted at /content/drive
+data = pd.read_csv('/content/drive/MyDrive/EnsembleTech/EasyVisa.csv')
+# copying data to another variable to avoid any changes to original data
+datac = data.copy()
+Data Overview
+Observations
+Sanity checks
+#checking first 5 and last 5 rows of the data
+datac.head()
+case_id	continent	education_of_employee	has_job_experience	requires_job_training	no_of_employees	yr_of_estab	region_of_employment	prevailing_wage	unit_of_wage	full_time_position	case_status
+0	EZYV01	Asia	High School	N	N	14513	2007	West	592.2029	Hour	Y	Denied
+1	EZYV02	Asia	Master's	Y	N	2412	2002	Northeast	83425.6500	Year	Y	Certified
+2	EZYV03	Asia	Bachelor's	N	Y	44444	2008	West	122996.8600	Year	Y	Denied
+3	EZYV04	Asia	Bachelor's	N	N	98	1897	West	83434.0300	Year	Y	Denied
+4	EZYV05	Africa	Master's	Y	N	1082	2005	South	149907.3900	Year	Y	Certified
+datac.tail()
+case_id	continent	education_of_employee	has_job_experience	requires_job_training	no_of_employees	yr_of_estab	region_of_employment	prevailing_wage	unit_of_wage	full_time_position	case_status
+25475	EZYV25476	Asia	Bachelor's	Y	Y	2601	2008	South	77092.57	Year	Y	Certified
+25476	EZYV25477	Asia	High School	Y	N	3274	2006	Northeast	279174.79	Year	Y	Certified
+25477	EZYV25478	Asia	Master's	Y	N	1121	1910	South	146298.85	Year	N	Certified
+25478	EZYV25479	Asia	Master's	Y	Y	1918	1887	West	86154.77	Year	Y	Certified
+25479	EZYV25480	Asia	Bachelor's	Y	N	3195	1960	Midwest	70876.91	Year	Y	Certified
+datac.duplicated().sum()
+0
+There are no duplicates in the data
+#checking the shape of the data
+data.shape
+(25480, 12)
+#checking info
+datac.info()
+<class 'pandas.core.frame.DataFrame'>
+RangeIndex: 25480 entries, 0 to 25479
+Data columns (total 12 columns):
+ #   Column                 Non-Null Count  Dtype  
+---  ------                 --------------  -----  
+ 0   case_id                25480 non-null  object 
+ 1   continent              25480 non-null  object 
+ 2   education_of_employee  25480 non-null  object 
+ 3   has_job_experience     25480 non-null  object 
+ 4   requires_job_training  25480 non-null  object 
+ 5   no_of_employees        25480 non-null  int64  
+ 6   yr_of_estab            25480 non-null  int64  
+ 7   region_of_employment   25480 non-null  object 
+ 8   prevailing_wage        25480 non-null  float64
+ 9   unit_of_wage           25480 non-null  object 
+ 10  full_time_position     25480 non-null  object 
+ 11  case_status            25480 non-null  object 
+dtypes: float64(1), int64(2), object(9)
+memory usage: 2.3+ MB
+There are 3 numerical and 9 object type data.
+#checking for missing values
+data.isnull().sum()
+case_id                  0
+continent                0
+education_of_employee    0
+has_job_experience       0
+requires_job_training    0
+no_of_employees          0
+yr_of_estab              0
+region_of_employment     0
+prevailing_wage          0
+unit_of_wage             0
+full_time_position       0
+case_status              0
+dtype: int64
+There are no missing values.
+#statiscal summary of the data
+datac.describe().T
+count	mean	std	min	25%	50%	75%	max
+no_of_employees	25480.0	5667.043210	22877.928848	-26.0000	1022.00	2109.00	3504.0000	602069.00
+yr_of_estab	25480.0	1979.409929	42.366929	1800.0000	1976.00	1997.00	2005.0000	2016.00
+prevailing_wage	25480.0	74455.814592	52815.942327	2.1367	34015.48	70308.21	107735.5125	319210.27
+It seems there are a few negative values in no_of_employees column which will be fixed.
+#fixing negative values in no_of_employees
+datac.loc[datac['no_of_employees']<0].shape
+(33, 12)
+# taking the absolute values 
+datac["no_of_employees"] = abs(datac["no_of_employees"])
+datac.loc[datac['no_of_employees']<0].shape
+(0, 12)
+#checking for unique case_id
+data["case_id"].nunique
+<bound method IndexOpsMixin.nunique of 0           EZYV01
+1           EZYV02
+2           EZYV03
+3           EZYV04
+4           EZYV05
+           ...    
+25475    EZYV25476
+25476    EZYV25477
+25477    EZYV25478
+25478    EZYV25479
+25479    EZYV25480
+Name: case_id, Length: 25480, dtype: object>
+All ids are unique, so we can drop the column.
+#dropping case_id
+datac.drop(['case_id'], axis=1, inplace=True)
+datac.shape
+(25480, 11)
+datac.describe().T
+count	mean	std	min	25%	50%	75%	max
+no_of_employees	25480.0	5667.089207	22877.917453	11.0000	1022.00	2109.00	3504.0000	602069.00
+yr_of_estab	25480.0	1979.409929	42.366929	1800.0000	1976.00	1997.00	2005.0000	2016.00
+prevailing_wage	25480.0	74455.814592	52815.942327	2.1367	34015.48	70308.21	107735.5125	319210.27
+There are no negative values in the data.
+Exploratory Data Analysis (EDA)
+EDA is an important part of any project involving data.
+It is important to investigate and understand the data better before building a model with it.
+A few questions have been mentioned below which will help you approach the analysis in the right manner and generate insights from the data.
+A thorough analysis of the data, in addition to the questions mentioned below, should be done.
+Leading Questions:
+
+Those with higher education may want to travel abroad for a well-paid job. Does education play a role in Visa certification?
+
+How does the visa status vary across different continents?
+
+Experienced professionals might look abroad for opportunities to improve their lifestyles and career development. Does work experience influence visa status?
+
+In the United States, employees are paid at different intervals. Which pay unit is most likely to be certified for a visa?
+
+The US government has established a prevailing wage to protect local talent and foreign workers. How does the visa status change with the prevailing wage?
+
+Univariate Analysis
+
+#function for histogram boxplot
+def histogram_boxplot(data, feature, figsize=(15, 10), kde=False, bins=None):
+    f2, (ax_box2, ax_hist2) = plt.subplots(
+        nrows=2,  
+        sharex=True, 
+        gridspec_kw={"height_ratios": (0.25, 0.75)},
+        figsize=figsize,
+    )  
+    sns.boxplot(
+        data=data, x=feature, ax=ax_box2, showmeans=True, color="violet"
+    )  
+    sns.histplot(
+        data=data, x=feature, kde=kde, ax=ax_hist2, bins=bins
+    ) if bins else sns.histplot(
+        data=data, x=feature, kde=kde, ax=ax_hist2
+    )  # For histogram
+    ax_hist2.axvline(
+        data[feature].mean(), color="green", linestyle="--"
+    )  # Add mean to the histogram
+    ax_hist2.axvline(
+        data[feature].median(), color="black", linestyle="-"
+    )  # Add median to the histogram
+continent
+
+sns.countplot(data = datac, x='continent');
+plt.xticks(rotation = 90);
+
+Most of the immigrants are from Asia and least are from Oceania.
+education_of_employee
+
+sns.countplot(data = datac, x='education_of_employee');
+plt.xticks(rotation = 90);
+
+Most of the candidates are immigrating after bachelor's degree.
+has_job_experience
+
+sns.countplot(data = datac, x='has_job_experience');
+
+About 15000 candidates have work experience.
+requires_job_training
+
+sns.countplot(data = datac, x='requires_job_training');
+
+Majority of the candidates do not require training.
+region_of_employment
+
+sns.countplot(data = datac, x='region_of_employment');
+
+Substantial amount of jobs are in West, Northeast and South region of the US.
+unit_of_wage
+
+sns.countplot(data = datac, x='unit_of_wage');
+
+Most of the employers offer annual compensation.
+full_time_position
+
+sns.countplot(data = datac, x='full_time_position');
+
+Highest number of full time positions are offered.
+case_status
+
+sns.countplot(data = datac, x='case_status');
+
+Most of the employees are certified.
+no_of_employees
+
+histogram_boxplot(datac, "no_of_employees")
+
+Clearly there are many outliers but it can be true since they are the number of employees in a company.
+prevailing_wage
+
+histogram_boxplot(datac,"prevailing_wage")
+
+Mean prevailing wage is around 75,000 usd.
+Bivariate Analysis
+
+#lets check the correlation
+plt.figure(figsize=(12, 7))
+sns.heatmap(
+    datac.corr(), annot=True, vmin=-1, vmax=1, fmt=".2f", cmap="Spectral"
+)
+plt.show()
+
+We cannot establish a clear relationship between the variables.
+education_of_employee and case_status
+
+#function for stacked barplot 
+def stacked_barplot(datac, x, y):
+
+    count = datac[x].nunique()
+    sorter = datac[y].value_counts().index[-1]
+    tab1 = pd.crosstab(datac[x], datac[y], margins=True).sort_values(
+        by=sorter, ascending=False
+    )
+    print(tab1)
+    print("-" * 120)
+    tab = pd.crosstab(datac[x], datac[y], normalize="index").sort_values(
+        by=sorter, ascending=False
+    )
+    tab.plot(kind="bar", stacked=True, figsize=(count + 5, 5))
+    plt.legend(
+        loc="lower left", frameon=False,
+    )
+    plt.legend(loc="upper left", bbox_to_anchor=(1, 1))
+    plt.show()
+stacked_barplot(data, "education_of_employee", "case_status")
+case_status            Certified  Denied    All
+education_of_employee                          
+All                        17018    8462  25480
+Bachelor's                  6367    3867  10234
+High School                 1164    2256   3420
+Master's                    7575    2059   9634
+Doctorate                   1912     280   2192
+------------------------------------------------------------------------------------------------------------------------
+
+There are more employees immigrating after bachelors but their denial rate is more than candidates with masters.
+Doctorates has the highest percent of acceptance rate.
+region_of_employment and case_status
+
+stacked_barplot(data, "region_of_employment", "case_status")
+case_status           Certified  Denied    All
+region_of_employment                          
+All                       17018    8462  25480
+Northeast                  4526    2669   7195
+West                       4100    2486   6586
+South                      4913    2104   7017
+Midwest                    3253    1054   4307
+Island                      226     149    375
+------------------------------------------------------------------------------------------------------------------------
+
+Highest percent certification is from the midwent region.
+continent and case_status
+
+stacked_barplot(data, "continent", "case_status")
+case_status    Certified  Denied    All
+continent                              
+All                17018    8462  25480
+Asia               11012    5849  16861
+North America       2037    1255   3292
+Europe              2957     775   3732
+South America        493     359    852
+Africa               397     154    551
+Oceania              122      70    192
+------------------------------------------------------------------------------------------------------------------------
+
+Europe has the highest certification rate while South America has the least.
+has_job_experience and case_status
+
+stacked_barplot(data, "has_job_experience", "case_status")
+case_status         Certified  Denied    All
+has_job_experience                          
+All                     17018    8462  25480
+N                        5994    4684  10678
+Y                       11024    3778  14802
+------------------------------------------------------------------------------------------------------------------------
+
+The rate of cartification is more for the candidates with job experience.
+unit_of_wage and case_stutus
+
+stacked_barplot(data, "unit_of_wage", "case_status")
+case_status   Certified  Denied    All
+unit_of_wage                          
+All               17018    8462  25480
+Year              16047    6915  22962
+Hour                747    1410   2157
+Week                169     103    272
+Month                55      34     89
+------------------------------------------------------------------------------------------------------------------------
+
+Annual wage compensation has the highest certification rate.
+has_job_experience and requires_job_training
+
+stacked_barplot(data, "has_job_experience", "requires_job_training")
+requires_job_training      N     Y    All
+has_job_experience                       
+All                    22525  2955  25480
+N                       8988  1690  10678
+Y                      13537  1265  14802
+------------------------------------------------------------------------------------------------------------------------
+
+Most of the candidates with work experience do not require job training.
+education_of_employee and region_of_employment
+
+stacked_barplot(data, "education_of_employee", "region_of_employment")
+region_of_employment   Island  Midwest  Northeast  South  West    All
+education_of_employee                                                
+All                       375     4307       7195   7017  6586  25480
+Master's                  161     2000       2760   2551  2162   9634
+Bachelor's                129     1315       2874   2991  2925  10234
+High School                60      736        905    934   785   3420
+Doctorate                  25      256        656    541   714   2192
+------------------------------------------------------------------------------------------------------------------------
+
+Most of the doctorates go to west for the employment.
+Similarly of the bachelors immigrate to the west.
+region_of_employment and prevailing_wage
+
+plt.figure(figsize=(10, 5))
+sns.boxplot(data=datac,x='region_of_employment',y='prevailing_wage') 
+plt.show()
+
+Midwest region and Island region has the highest mean prevailing wage amongst other regions.
+prevailing_wage and case_status
+
+plt.figure(figsize=(10, 8))
+sns.boxplot(data=datac, x='case_status',y='prevailing_wage');
+
+If the prevailing wage is higher, certification rate is higher.
+Data Preprocessing
+Missing value treatment (if needed)
+Feature engineering
+Outlier detection and treatment (if needed)
+Preparing data for modeling
+Any other preprocessing steps (if needed)
+#using boxplot for outliers
+numeric_columns = datac.select_dtypes(include=np.number).columns.tolist()
+
+plt.figure(figsize=(16, 14))
+
+for i, variable in enumerate(numeric_columns):
+    plt.subplot(4, 4, i + 1)
+    plt.boxplot(data[variable], whis=1.5)
+    plt.tight_layout()
+    plt.title(variable)
+
+plt.show()
+
+There are multiple outliers but those are all facts, hence cannot be dropped.
+Data preparation for modelling to predit certified case status
+
+datac["case_status"] = datac["case_status"].apply(lambda x: 1 if x == "Certified" else 0)
+
+X = datac.drop(['case_status'], axis=1) 
+y = datac["case_status"]
+
+
+X = pd.get_dummies(X,
+    columns=X.select_dtypes(include=["object", "category"]).columns.tolist(),
+    drop_first=True,)   
+
+# Splitting data in train and test sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=1) 
+print("Shape of Training set : ", X_train.shape)
+print('-----------------------------------------------')
+print("Shape of test set : ", X_test.shape)
+print('-----------------------------------------------')
+print("Percentage of classes in training set:")
+print(y_train.value_counts(normalize=True))
+print('-----------------------------------------------')
+print("Percentage of classes in test set:")
+print(y_test.value_counts(normalize=True))
+Shape of Training set :  (17836, 21)
+-----------------------------------------------
+Shape of test set :  (7644, 21)
+-----------------------------------------------
+Percentage of classes in training set:
+1    0.663602
+0    0.336398
+Name: case_status, dtype: float64
+-----------------------------------------------
+Percentage of classes in test set:
+1    0.677917
+0    0.322083
+Name: case_status, dtype: float64
+Model Evaluation
+
+#to check performance of a classification model
+
+def model_performance_classification_sklearn(model, predictors, target):
+
+    # predicting using the independent variables
+    pred = model.predict(predictors)
+
+    acc = accuracy_score(target, pred) 
+    recall = recall_score(target, pred)  
+    precision = precision_score(target, pred) 
+    f1 = f1_score(target, pred)  
+
+    df_perf = pd.DataFrame(
+        {"Accuracy": acc, "Recall": recall, "Precision": precision, "F1": f1,},
+        index=[0],
+    )
+
+    return df_perf
+def confusion_matrix_sklearn(model, predictors, target):
+
+    y_pred = model.predict(predictors)
+    cm = confusion_matrix(target, y_pred)
+    labels = np.asarray(
+        [
+            ["{0:0.0f}".format(item) + "\n{0:.2%}".format(item / cm.flatten().sum())]
+            for item in cm.flatten()
+        ]
+    ).reshape(2, 2)
+
+    plt.figure(figsize=(6, 4))
+    sns.heatmap(cm, annot=labels, fmt="")
+    plt.ylabel("True label")
+    plt.xlabel("Predicted label")
+Decision Tree Model
+
+model = DecisionTreeClassifier(random_state=1)
+model.fit(X_train, y_train) 
+DecisionTreeClassifier(random_state=1)
+Model performance on training set
+
+confusion_matrix_sklearn(model,X_train,y_train) 
+
+decision_tree_perf_train = model_performance_classification_sklearn(
+    model, X_train, y_train
+)
+decision_tree_perf_train
+Accuracy	Recall	Precision	F1
+0	1.0	1.0	1.0	1.0
+Model Performance on test set
+
+confusion_matrix_sklearn(model,X_test,y_test) 
+
+decision_tree_perf_test = model_performance_classification_sklearn(model,X_test,y_test)
+decision_tree_perf_test
+Accuracy	Recall	Precision	F1
+0	0.66405	0.742184	0.757385	0.749708
+Decision tree is working well on the training set but not on the test set.
+Lets estimate pre-pruning
+
+#type of classifier.
+estimator = DecisionTreeClassifier(class_weight="balanced", random_state=1)
+
+# Grid of parameters to choose from
+parameters = {
+    "max_depth": np.arange(5, 16, 5),
+    "min_samples_leaf": [3, 5, 7],
+    "max_leaf_nodes": [2, 5],
+    "min_impurity_decrease": [0.0001, 0.001],
+}
+
+# Type of scoring used to compare parameter combinations
+acc_scorer = metrics.make_scorer(metrics.f1_score)
+
+# Run the grid search
+grid_obj = GridSearchCV(estimator, parameters, scoring= acc_scorer, n_jobs=-1) 
+
+grid_obj = grid_obj.fit(X_train, y_train) 
+
+# Set the clf to the best combination of parameters
+estimator = grid_obj.best_estimator_
+
+# Fit the best algorithm to the data.
+estimator.fit(X_train, y_train)
+DecisionTreeClassifier(class_weight='balanced', max_depth=5, max_leaf_nodes=2,
+                       min_impurity_decrease=0.0001, min_samples_leaf=3,
+                       random_state=1)
+Checking performance on training set based on the estimator
+
+confusion_matrix_sklearn(estimator,X_train,y_train) 
+
+decision_tree_tune_perf_train = model_performance_classification_sklearn(estimator,X_train,y_train) 
+decision_tree_tune_perf_train
+Accuracy	Recall	Precision	F1
+0	0.70795	0.931734	0.714758	0.808949
+Checking performance on test set based on estimator
+
+confusion_matrix_sklearn(estimator,X_test,y_test)
+
+decision_tree_tune_perf_test = model_performance_classification_sklearn(estimator,X_test,y_test) 
+decision_tree_tune_perf_test
+Accuracy	Recall	Precision	F1
+0	0.717295	0.931301	0.727794	0.817066
+Overfitting has been reduced.
+Building bagging and boosting models
+#bagging model
+bagging = BaggingClassifier(random_state=1)
+bagging.fit(X_train,y_train)
+BaggingClassifier(random_state=1)
+Model Performance on training set
+
+#confusion matrix
+confusion_matrix_sklearn(bagging, X_train, y_train)
+
+bagging_model_train_perf=model_performance_classification_sklearn(bagging, X_train, y_train)
+print("Training performance \n",bagging_model_train_perf)
+Training performance 
+    Accuracy    Recall  Precision        F1
+0  0.984526  0.985468   0.991162  0.988307
+Model Performance on test set
+
+confusion_matrix_sklearn(bagging, X_test, y_test)
+
+bagging_model_test_perf=model_performance_classification_sklearn(bagging, X_test, y_test)
+print("Testing performance \n",bagging_model_test_perf)
+Testing performance 
+    Accuracy    Recall  Precision       F1
+0  0.696102  0.773061   0.777411  0.77523
+Bagging classifier is overfitting on the training set and is performing poorly on the test set.
+Hyperparameter tuning for Bagging Classifier
+
+bagging_estimator_tuned = BaggingClassifier(random_state=1)
+
+# Grid of parameters to choose from
+parameters = {
+    "max_samples": [0.7, 0.9],
+    "max_features": [0.7, 0.9],
+    "n_estimators": np.arange(90, 111, 10),
+}
+
+# Type of scoring used to compare parameter combinations
+acc_scorer = metrics.make_scorer(metrics.f1_score)
+
+# Run the grid search
+grid_obj = GridSearchCV(bagging_estimator_tuned, parameters, scoring= acc_scorer, cv=5) 
+
+grid_obj = grid_obj.fit(X_train, y_train)
+
+# Set the clf to the best combination of parameters
+bagging_estimator_tuned = grid_obj.best_estimator_
+
+# Fit the best algorithm to the data.
+bagging_estimator_tuned.fit(X_train, y_train)
+BaggingClassifier(max_features=0.7, max_samples=0.7, n_estimators=110,
+                  random_state=1)
+Model performance on traning set
+
+confusion_matrix_sklearn(bagging_estimator_tuned, X_train, y_train)
+
+bagging_estimator_tuned_model_train_perf = model_performance_classification_sklearn(bagging_estimator_tuned, X_train, y_train) 
+bagging_estimator_tuned_model_train_perf
+Accuracy	Recall	Precision	F1
+0	0.996187	0.999916	0.994371	0.997135
+Model performance on test set
+
+confusion_matrix_sklearn(bagging_estimator_tuned, X_test, y_test)
+
+bagging_estimator_tuned_model_test_perf = model_performance_classification_sklearn(bagging_estimator_tuned, X_test, y_test) 
+bagging_estimator_tuned_model_test_perf
+Accuracy	Recall	Precision	F1
+0	0.733909	0.899074	0.755105	0.820825
+Recall has improved a lot but accuracy and precision does not change.
+Random Forest
+
+rf = RandomForestClassifier(random_state=1,class_weight = 'balanced')
+rf.fit(X_train,y_train)
+RandomForestClassifier(class_weight='balanced', random_state=1)
+Model Performance on training set
+
+confusion_matrix_sklearn(rf,X_train,y_train)
+
+rf_estimator_model_train_perf = model_performance_classification_sklearn(rf,X_train,y_train)
+rf_estimator_model_train_perf
+Accuracy	Recall	Precision	F1
+0	0.999944	1.0	0.999916	0.999958
+Model performance on test set
+
+confusion_matrix_sklearn(rf,X_test,y_test)
+
+rf_estimator_model_test_perf = model_performance_classification_sklearn(rf,X_test,y_test)
+rf_estimator_model_test_perf
+Accuracy	Recall	Precision	F1
+0	0.731816	0.847356	0.777168	0.810746
+Random forest does not look like it is performing well. Needs tuning.
+Hyperparameter tuning for random forest
+
+rf_tuned = RandomForestClassifier(random_state=1, oob_score=True, bootstrap=True)
+
+parameters = {
+    "max_depth": list(np.arange(5, 15, 5)),
+    "max_features": ["sqrt", "log2"],
+    "min_samples_split": [5, 7],
+    "n_estimators": np.arange(15, 26, 5),
+}
+
+# Type of scoring used to compare parameter combinations
+acc_scorer = metrics.make_scorer(metrics.f1_score)
+
+# Run the grid search
+grid_obj = GridSearchCV(rf_tuned, parameters, scoring= acc_scorer, cv=5 ,n_jobs = -1)
+grid_obj = grid_obj.fit(X_train, y_train) 
+
+# Set the clf to the best combination of parameters
+rf_tuned = grid_obj.best_estimator_
+
+# Fit the best algorithm to the data.
+rf_tuned.fit(X_train, y_train)
+/usr/local/lib/python3.7/dist-packages/sklearn/ensemble/_forest.py:564: UserWarning: Some inputs do not have OOB scores. This probably means too few trees were used to compute any reliable OOB estimates.
+  UserWarning,
+/usr/local/lib/python3.7/dist-packages/sklearn/ensemble/_forest.py:564: UserWarning: Some inputs do not have OOB scores. This probably means too few trees were used to compute any reliable OOB estimates.
+  UserWarning,
+RandomForestClassifier(max_depth=10, max_features='sqrt', min_samples_split=7,
+                       n_estimators=20, oob_score=True, random_state=1)
+Model performance on training set
+
+confusion_matrix_sklearn(rf_tuned, X_train,y_train)
+
+rf_tuned_model_train_perf=model_performance_classification_sklearn(rf_tuned, X_train,y_train)
+rf_tuned_model_train_perf
+Accuracy	Recall	Precision	F1
+0	0.765699	0.910696	0.775412	0.837627
+Model performance on test set
+
+confusion_matrix_sklearn(rf_tuned, X_test,y_test)
+
+rf_tuned_model_test_perf = model_performance_classification_sklearn(rf_tuned, X_test, y_test) 
+rf_tuned_model_test_perf
+Accuracy	Recall	Precision	F1
+0	0.749084	0.894056	0.771909	0.828505
+Tuning does improve the test set for random forest.
+Adaboost Classifier
+
+abc = AdaBoostClassifier(random_state=1)
+abc.fit(X_train,y_train)
+AdaBoostClassifier(random_state=1)
+Model performance for train set
+
+confusion_matrix_sklearn(abc, X_train,y_train)
+
+ab_classifier_model_train_perf = model_performance_classification_sklearn(abc, X_train,y_train) 
+ab_classifier_model_train_perf
+Accuracy	Recall	Precision	F1
+0	0.737441	0.885941	0.75881	0.817462
+Model performance on test set
+
+confusion_matrix_sklearn(abc, X_test,y_test)
+
+ab_classifier_model_test_perf = model_performance_classification_sklearn(abc, X_test,y_test) 
+ab_classifier_model_test_perf
+Accuracy	Recall	Precision	F1
+0	0.738488	0.885951	0.765294	0.821215
+Hyperparameter tuning for Adabooster
+
+abc_tuned = AdaBoostClassifier(random_state=1)
+
+# Grid of parameters to choose from
+parameters = {
+    # Let's try different max_depth for base_estimator
+    "base_estimator": [
+        DecisionTreeClassifier(max_depth=1, class_weight="balanced", random_state=1),
+        DecisionTreeClassifier(max_depth=2, class_weight="balanced", random_state=1),
+    ],
+    "n_estimators": np.arange(80, 101, 10),
+    "learning_rate": np.arange(0.1, 0.4, 0.1),
+}
+
+# Type of scoring used to compare parameter  combinations
+acc_scorer = metrics.make_scorer(metrics.f1_score)
+
+# Run the grid search
+grid_obj = GridSearchCV(abc_tuned, parameters, scoring= acc_scorer, cv=5)  
+grid_obj = grid_obj.fit(X_train, y_train) 
+
+# Set the clf to the best combination of parameters
+abc_tuned = grid_obj.best_estimator_
+
+# Fit the best algorithm to the data.
+abc_tuned.fit(X_train, y_train)
+AdaBoostClassifier(base_estimator=DecisionTreeClassifier(class_weight='balanced',
+                                                         max_depth=1,
+                                                         random_state=1),
+                   learning_rate=0.1, n_estimators=90, random_state=1)
+Model performance on train set
+
+confusion_matrix_sklearn(abc_tuned, X_train,y_train)
+
+abc_tuned_model_train_perf = model_performance_classification_sklearn(abc_tuned, X_train,y_train)
+abc_tuned_model_train_perf
+Accuracy	Recall	Precision	F1
+0	0.718042	0.780162	0.79187	0.785973
+Model performance on test set
+
+confusion_matrix_sklearn(abc_tuned, X_test,y_test)
+
+abc_tuned_model_test_perf = model_performance_classification_sklearn(abc_tuned, X_test,y_test)
+abc_tuned_model_test_perf
+Accuracy	Recall	Precision	F1
+0	0.718472	0.783674	0.797526	0.790539
+Adaboost fits well for both train and test set.
+Gradient boosting classifier
+
+gbc = GradientBoostingClassifier(random_state=1)
+gbc.fit(X_train,y_train)
+GradientBoostingClassifier(random_state=1)
+Model performance on train set
+
+confusion_matrix_sklearn(gbc, X_train,y_train)
+
+gb_classifier_model_train_perf = model_performance_classification_sklearn(gbc, X_train,y_train) 
+gb_classifier_model_train_perf
+Accuracy	Recall	Precision	F1
+0	0.755607	0.876479	0.781704	0.826383
+Model performance on test set
+
+confusion_matrix_sklearn(gbc, X_test,y_test)
+
+gb_classifier_model_test_perf = model_performance_classification_sklearn(gbc, X_test,y_test) 
+gb_classifier_model_test_perf
+Accuracy	Recall	Precision	F1
+0	0.751308	0.870513	0.785752	0.825964
+Hyperparameter tuning for gradient boosting
+
+gbc_tuned = GradientBoostingClassifier(
+    init=AdaBoostClassifier(random_state=1), random_state=1
+)
+
+# Grid of parameters to choose from
+parameters = {
+    "n_estimators": [200, 250],
+    "subsample": [0.9, 1],
+    "max_features": [0.8, 0.9],
+    "learning_rate": np.arange(0.1, 0.21, 0.1),
+}
+
+# Type of scoring used to compare parameter combinations
+acc_scorer = metrics.make_scorer(metrics.f1_score)
+
+# Run the grid search
+grid_obj = GridSearchCV(gbc_tuned, parameters, scoring= acc_scorer, cv=5) 
+grid_obj = grid_obj.fit(X_train, y_train) 
+
+# Set the clf to the best combination of parameters
+gbc_tuned = grid_obj.best_estimator_
+
+# Fit the best algorithm to the data.
+gbc_tuned.fit(X_train, y_train)
+GradientBoostingClassifier(init=AdaBoostClassifier(random_state=1),
+                           max_features=0.9, n_estimators=200, random_state=1,
+                           subsample=0.9)
+Model performance on train set
+
+confusion_matrix_sklearn(gbc_tuned, X_train,y_train)
+
+gbc_tuned_model_train_perf = model_performance_classification_sklearn(gbc_tuned, X_train,y_train) 
+gbc_tuned_model_train_perf
+Accuracy	Recall	Precision	F1
+0	0.760933	0.87707	0.787036	0.829617
+Model performance on test set
+
+confusion_matrix_sklearn(gbc_tuned, X_test,y_test)
+
+gbc_tuned_model_test_perf = model_performance_classification_sklearn(gbc_tuned, X_test,y_test) 
+gbc_tuned_model_test_perf
+Accuracy	Recall	Precision	F1
+0	0.750262	0.864724	0.78766	0.824395
+Gradient boost fits well for both test and train set.
+Stacking classifier
+
+estimators = [
+    ("AdaBoost", abc),
+    ("Gradient Boosting", gbc_tuned),
+    ("Random Forest", rf_tuned),
+]
+
+stacking_classifier = StackingClassifier(estimators=estimators,cv=5)
+
+stacking_classifier.fit(X_train,y_train) 
+/usr/local/lib/python3.7/dist-packages/sklearn/ensemble/_forest.py:564: UserWarning: Some inputs do not have OOB scores. This probably means too few trees were used to compute any reliable OOB estimates.
+  UserWarning,
+StackingClassifier(cv=5,
+                   estimators=[('AdaBoost', AdaBoostClassifier(random_state=1)),
+                               ('Gradient Boosting',
+                                GradientBoostingClassifier(init=AdaBoostClassifier(random_state=1),
+                                                           max_features=0.9,
+                                                           n_estimators=200,
+                                                           random_state=1,
+                                                           subsample=0.9)),
+                               ('Random Forest',
+                                RandomForestClassifier(max_depth=10,
+                                                       max_features='sqrt',
+                                                       min_samples_split=7,
+                                                       n_estimators=20,
+                                                       oob_score=True,
+                                                       random_state=1))])
+Model peformance for train set
+
+confusion_matrix_sklearn(stacking_classifier, X_train,y_train)
+
+stacking_classifier_model_train_perf = model_performance_classification_sklearn(stacking_classifier, X_train,y_train) 
+stacking_classifier_model_train_perf
+Accuracy	Recall	Precision	F1
+0	0.765755	0.887377	0.786859	0.834101
+Model performance on test set
+
+confusion_matrix_sklearn(stacking_classifier, X_test,y_test)
+
+stacking_classifier_model_test_perf = model_performance_classification_sklearn(stacking_classifier, X_test,y_test)
+stacking_classifier_model_test_perf
+Accuracy	Recall	Precision	F1
+0	0.75157	0.872057	0.78523	0.826369
+Model Performance Comparison and Conclusions
+# training performance comparison
+
+models_train_comp_df = pd.concat(
+    [
+        decision_tree_perf_train.T,
+        decision_tree_tune_perf_train.T,
+        bagging_model_train_perf.T,
+        bagging_estimator_tuned_model_train_perf.T,
+        rf_estimator_model_train_perf.T,
+        rf_tuned_model_train_perf.T,
+        ab_classifier_model_train_perf.T,
+        abc_tuned_model_train_perf.T,
+        gb_classifier_model_train_perf.T,
+        gbc_tuned_model_train_perf.T,
+        stacking_classifier_model_train_perf.T,
+    ],
+    axis=1,
+)
+models_train_comp_df.columns = [
+    "Decision Tree",
+    "Tuned Decision Tree",
+    "Bagging Classifier",
+    "Tuned Bagging Classifier",
+    "Random Forest",
+    "Tuned Random Forest",
+    "Adaboost Classifier",
+    "Tuned Adaboost Classifier",
+    "Gradient Boost Classifier",
+    "Tuned Gradient Boost Classifier",
+    "Stacking Classifier",
+]
+print("Training performance comparison:")
+models_train_comp_df
+Training performance comparison:
+Decision Tree	Tuned Decision Tree	Bagging Classifier	Tuned Bagging Classifier	Random Forest	Tuned Random Forest	Adaboost Classifier	Tuned Adaboost Classifier	Gradient Boost Classifier	Tuned Gradient Boost Classifier	Stacking Classifier
+Accuracy	1.0	0.707950	0.984526	0.996187	0.999944	0.765699	0.737441	0.718042	0.755607	0.760933	0.765755
+Recall	1.0	0.931734	0.985468	0.999916	1.000000	0.910696	0.885941	0.780162	0.876479	0.877070	0.887377
+Precision	1.0	0.714758	0.991162	0.994371	0.999916	0.775412	0.758810	0.791870	0.781704	0.787036	0.786859
+F1	1.0	0.808949	0.988307	0.997135	0.999958	0.837627	0.817462	0.785973	0.826383	0.829617	0.834101
+# testing performance comparison
+
+models_test_comp_df = pd.concat(
+    [
+        decision_tree_perf_test.T,
+        decision_tree_tune_perf_test.T,
+        bagging_model_test_perf.T,
+        bagging_estimator_tuned_model_test_perf.T,
+        rf_estimator_model_test_perf.T,
+        rf_tuned_model_test_perf.T,
+        ab_classifier_model_test_perf.T,
+        abc_tuned_model_test_perf.T,
+        gb_classifier_model_test_perf.T,
+        gbc_tuned_model_test_perf.T,
+        stacking_classifier_model_test_perf.T,
+    ],
+    axis=1,
+)
+models_test_comp_df.columns = [
+    "Decision Tree",
+    "Tuned Decision Tree",
+    "Bagging Classifier",
+    "Tuned Bagging Classifier",
+    "Random Forest",
+    "Tuned Random Forest",
+    "Adaboost Classifier",
+    "Tuned Adaboost Classifier",
+    "Gradient Boost Classifier",
+    "Tuned Gradient Boost Classifier",
+    "Stacking Classifier",
+]
+print("Testing performance comparison:")
+models_test_comp_df
+Testing performance comparison:
+Decision Tree	Tuned Decision Tree	Bagging Classifier	Tuned Bagging Classifier	Random Forest	Tuned Random Forest	Adaboost Classifier	Tuned Adaboost Classifier	Gradient Boost Classifier	Tuned Gradient Boost Classifier	Stacking Classifier
+Accuracy	0.664050	0.717295	0.696102	0.733909	0.731816	0.749084	0.738488	0.718472	0.751308	0.750262	0.751570
+Recall	0.742184	0.931301	0.773061	0.899074	0.847356	0.894056	0.885951	0.783674	0.870513	0.864724	0.872057
+Precision	0.757385	0.727794	0.777411	0.755105	0.777168	0.771909	0.765294	0.797526	0.785752	0.787660	0.785230
+F1	0.749708	0.817066	0.775230	0.820825	0.810746	0.828505	0.821215	0.790539	0.825964	0.824395	0.826369
+Decision tree performed well on training and test set.
+All 3 boosting methods performed well on training and test set.
+Final model - Important features
+
+feature_names = X_train.columns
+importances = gbc.feature_importances_
+indices = np.argsort(importances)
+
+plt.figure(figsize=(12, 12))
+plt.title("Feature Importances")
+plt.barh(range(len(indices)), importances[indices], color="violet", align="center")
+plt.yticks(range(len(indices)), [feature_names[i] for i in indices])
+plt.xlabel("Relative Importance")
+plt.show()
+
+Actionable Insights and Recommendations
+We can use this predictive model and can help shortlisting the candidates having higher chances of VISA approval.
+The ability to predict the number of candidates to get their visa approved allow the OFLC to manage the applications more efficiently.
+It seems like, candidates with a high school education is the most important feature for cerification of a visa.
+Having a masters degree or a doctorate level education is benficial but not on a high level. It might land a high paying job but it is not the most important feature.
+Along with high school education, having work experience is also a plus to get a visa.
+Visa applications does not depend on the region they applying from. IT alos does not depend if it is a full time position or a part time.
+Since the number of applications are increasing every year, inorder to work efficiently, OFLC should adapt this model and start filtering applications based on the important features as mentiond above.
